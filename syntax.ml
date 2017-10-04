@@ -169,6 +169,142 @@ end = struct
 
 
 end
+and A : sig
+  type loc = string
+  
+  type ty = 
+    TyVar of string
+    | TyUnit
+    | TyBool
+    | TyExist of string * ty
+    | TyRec of string * ty
+    | TyRef of hty
+    | TyBox of hty
+  and hty =
+    TyCode of string list * ty list * ty
+    | TyTuple of ty list
+    | TySum of ty * ty
+  
+  type selector =
+    TupleSelect of int (* nat *)
+    | InlSelect
+    | InrSelect
+  
+  type t = 
+    TVar of l * string
+    | TUnit of l
+    | TBool of l * bool
+    | TIf of l * t * t * t
+    | TApp of l * t * t list
+    | TInst of l * t * ty
+    | TPack of l * ty * t * string * ty
+    | TUnpack of l * string * string * t * t
+    | TFold of l * string * ty * t
+    | TUnfold of l * t
+    | TLoc of l * loc
+    | TRalloc of l * h (* a *)
+    | TBalloc of l * h (* a *)
+    | TUpd of l * selector * t * t
+    | TProj of l * int * t (* nat *)
+    | TCase of l * t * string * t * string * t
+    | TLet of l * string * t * t
+  and h =
+    HCode of l * string list * (string * ty) list * t
+    | HTuple of l * t list
+    | HInl of l * t
+    | HInr of l * t
+    
+  type hkind = HKRef | HKBox
+  
+  type heap = (loc * h) list
+  
+  type heapty = (loc * hkind * hty) list
+  
+  type tyctx = string list
+  
+  type ctx = (string * ty) list
+  
+  type component = t * heap
+  
+  val isValue : t -> bool
+  
+  val isAllocatable : h -> bool
+  
+  (* val isHeapValue : h -> bool *)
+  
+end = struct
+    type loc = string
+  
+    type ty = 
+      TyVar of string
+      | TyUnit
+      | TyBool
+      | TyExist of string * ty
+      | TyRec of string * ty
+      | TyRef of hty
+      | TyBox of hty
+    and hty =
+      TyCode of string list * ty list * ty
+      | TyTuple of ty list
+      | TySum of ty * ty
+  
+    type selector =
+      TupleSelect of int (* nat *)
+      | InlSelect
+      | InrSelect
+  
+    type t = 
+      TVar of l * string
+      | TUnit of l
+      | TBool of l * bool
+      | TIf of l * t * t * t
+      | TApp of l * t * t list
+      | TInst of l * t * ty
+      | TPack of l * ty * t * string * ty
+      | TUnpack of l * string * string * t * t
+      | TFold of l * string * ty * t
+      | TUnfold of l * t
+      | TLoc of l * loc
+      | TRalloc of l * h (* a *)
+      | TBalloc of l * h (* a *)
+      | TUpd of l * selector * t * t
+      | TProj of l * int * t (* nat *)
+      | TCase of l * t * string * t * string * t
+      | TLet of l * string * t * t
+    and h =
+      HCode of l * string list * (string * ty) list * t
+      | HTuple of l * t list
+      | HInl of l * t
+      | HInr of l * t
+  type hkind = HKRef | HKBox
+
+  type heap = (loc * h) list
+
+  type heapty = (loc * hkind * hty) list
+
+  type tyctx = string list
+
+  type ctx = (string * ty) list
+
+  type component = t * heap
+  
+  let rec isValue = function
+      | TVar _ -> true
+      | TUnit _ -> true
+      | TBool _ -> true
+      | TInst (_, t, _) -> isValue t
+      | TPack (_, _, t, _, _) -> isValue t
+      | TFold (_, _, _, t) -> isValue t
+      | TLoc _ -> true
+      | _ -> false
+  
+  let rec isAllocatable = function
+      | HTuple _ -> true
+      | HInl _ -> true
+      | HInr _ -> true
+      | HCode _ -> false
+  
+end
 and TAL : sig
 
   type reg = string
