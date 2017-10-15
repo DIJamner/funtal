@@ -2,29 +2,32 @@ module Compiler = struct
 
   open Syntax
   open FTAL
+  open TAL
   
 
-  type atstackelem = ABinding of string * A.ty | TElem of TAL.t
-  type atstack = ATStack of atstackelem list * TAL.sigma
+  type atstackelem = ABinding of string * A.ty | TElem of t
+  type atstack = ATStack of atstackelem list * sigma
 
   let toTalHVal = function
-  | (TAL.Ref, TAL.PTuple l) -> TAL.TTupleRef l
+  | (Ref, PTuple l) -> TTupleRef l
+  (* TODO: other cases *)
 
   let rec compileType = function 
-  | A.TyVar s -> TAL.TVar s
-  | A.TyBool -> TAL.TInt 
-  | A.TyExist (a,typ) -> TAL.TExists (a,compileType typ)
-  | A.TyRec (a, typ) -> TAL.TRec (a,compileType typ)
-  | A.TyRef htyp -> (toTalHVal (TAL.Ref, compileHType htyp)) (*TODO*)
-  | A.TyBox htyp -> TAL.TBox (compileHType htyp)
+  | A.TyVar s -> TVar s
+  | A.TyUnit -> TUnit
+  | A.TyBool -> TInt 
+  | A.TyExist (a,typ) -> TExists (a,compileType typ)
+  | A.TyRec (a, typ) -> TRec (a,compileType typ)
+  | A.TyRef htyp -> (toTalHVal (Ref, compileHType htyp)) (*TODO*)
+  | A.TyBox htyp -> TBox (compileHType htyp)
   and compileHType = function
   | A.TyCode (aas, args, res) -> 
     let zeta = gen_sym ~pref:"z"() in
     let epsilon = gen_sym ~pref:"e"() in
-    let raTy = TAL.TBox (PBlock ([], [("r1", compileType res)],
+    let raTy = TBox (PBlock ([], [("r1", compileType res)],
       SAbstract ([], zeta), QEpsilon epsilon)) in
-    let delta = (TAL.DZeta zeta)::(TAL.DEpsilon epsilon)
-      ::(List.map (fun x -> TAL.DAlpha x) aas) in
+    let delta = (DZeta zeta)::(DEpsilon epsilon)
+      ::(List.map (fun x -> DAlpha x) aas) in
     PBlock (delta, [("ra", raTy)], 
       SAbstract (List.map compileType args, zeta), QR"ra")
   | A.TyTuple typs -> PTuple (List.map compileType typs)
@@ -33,23 +36,24 @@ module Compiler = struct
 
   (* Compiles closed values *)
   let rec compileValue = function
-  | A.TUnit l -> Some (TAL.WUnit l)
-  | A.TBool (l, true) -> Some (TAL.WInt (l, 1))
-  | A.TBool (l, false) -> Some (TAL.WInt (l, 0))
+  | A.TUnit l -> Some (WUnit l)
+  | A.TBool (l, true) -> Some (WInt (l, 1))
+  | A.TBool (l, false) -> Some (WInt (l, 0))
   | A.TInst (l, v, typ) -> begin match compileValue v with
-    | Some w -> Some(TAL.WApp (l, w, [OT (compileType typ)]))
+    | Some w -> Some(WApp (l, w, [OT (compileType typ)]))
     | None -> None
     end
   | A.TPack (l, typ, v, a, etyp) -> 
     begin match compileValue v with
-    | Some w -> Some (TAL.WPack (l, compileType typ, w, a, compileType etyp))
+    | Some w -> Some (WPack (l, compileType typ, w, a, compileType etyp))
     | None -> None
     end
-  | A.TFold (l, a, typ, v) -> begin match v with
-    | Some w -> Some (TAL.WFold (l, a, compileType typ, w))
+  | A.TFold (l, a, typ, v) -> begin match compileValue v with
+    | Some w -> Some (WFold (l, a, compileType typ, w))
     | None -> None
     end
-  | A.TLoc (l, loc) -> Some(TAL.WLoc (l, loc))
+  | A.TLoc (l, loc) -> Some(WLoc (l, loc))
+  | _ -> None
 
 
   let rec optionMap f = function
@@ -61,9 +65,9 @@ module Compiler = struct
 
   (* assumes that hv typechecks at type psi *)
   let rec compileHeapValue initialHeapTy = function
-  | HCode (l, aas, xts, body) -> 
+  | A.HCode (l, aas, xts, body) -> 
     (*TODO: handle fail case *)
-    let TyCode (_, argTys, resTy) = A.getExpType aas xts body in
+    let A.TyCode (_, argTys, resTy) = A.getExpType aas xts body in
     let revArgTys = List.reverse argTys in
     let transArgTys = List.map compileType revArgTys in
     let zeta = gen_sym(pref="z") in
@@ -76,7 +80,7 @@ module Compiler = struct
       SAbstract ([], zeta)) in
     let (bodyInstrs, bodyHeap, bodyHeapTy) =
       compileExpr initialHeapTy aas argStack body zeta epsilon (QI 0) in
-    let h = TAL.HCode (DEpsilon epsilon :: DZeta zeta :: List.map DAlpha aas,
+    let h = HCode (DEpsilon epsilon :: DZeta zeta :: List.map DAlpha aas,
       [("ra", raTy)], SAbstract (transArgTys, zeta), QR"ra",
       Isalloc (l,1) ::
       Isst (l,0, "ra")::
@@ -84,7 +88,7 @@ module Compiler = struct
                                 OS (SAbstract([],zeta)) ::
                                 List.map (OT . TVar) aas)))::
       bodyInstrs) in
-    let retCode = TAL.HCode (DEpsilon epsilon :: DZeta zeta :: List.map DAlpha aas,
+    let retCode = HCode (DEpsilon epsilon :: DZeta zeta :: List.map DAlpha aas,
       ["r1", talResTy], SAbstract (raTy::transArgTys, zeta), QI 0,
       [Isld (l,"ra", 0),
       Isfree (l, List.len xts + 1),
@@ -93,7 +97,7 @@ module Compiler = struct
     let heapTy = (retLoc, PBlock (DEpsilon epsilon :: DZeta zeta :: List.map DAlpha aas,
       ["r1", talResTy], SAbstract (raTy::transArgTys, zeta), QI 0))::bodyHeapTy in  
     (h, heap, heapTy)
-  | HTuple vals -> 
+  | A.HTuple (l, vals) -> 
     let tvals = optionMap compileValue vals in
     (HTuple tvals, [], [])
   (* | HInl val -> ...
