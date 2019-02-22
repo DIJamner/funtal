@@ -606,6 +606,54 @@ end = struct
     | _  -> raise (TypeError ("Can't have mutable code pointers",l))
 
 end
+and A : sig
+  open Syntax.FTAL
+  open Syntax.A
+  
+  val ty_eq : ty -> ty -> bool
+  val tc_t : tyctx -> ctx -> t -> ty (* tyEnv env t *)
+  val type_sub : substitution -> ty -> ty
+  
+end = struct
+  open Syntax.FTAL
+  open Syntax.A
+  
+  let rec type_sub _ = raise (Failure "Not yet implemented")
+  
+  let rec ty_eq t1 t2 = match (t1, t2) with
+    | (TyUnit, TyUnit) -> true
+    | (TyBool, TyBool) -> true
+    | (TyVar x, TyVar x') -> x = x'
+    | (TyExist (a, t), TyExist (a', t')) -> ty_eq t (type_sub (AType (a',(TyVar a))) t')
+    | (TyRec (a, t), TyRec (a', t')) -> ty_eq t (type_sub (AType (a',(TyVar a))) t')
+    | (TyRef hty, TyRef hty') -> hty_eq hty hty'
+    | (TyBox hty, TyBox hty') -> hty_eq hty hty'
+    | _ -> false
+  and hty_eq hty1 hty2 = match (hty1, hty2) with
+    | (TyCode (delta, args, res), TyCode (delta', args', res')) -> 
+      (* TODO : rename-all*)
+      raise (FTAL.TypeError ("Type equality for code types not yet implemented", {line=1;col=1}))
+    | (TyTuple l1, TyTuple l2) -> list_for_all2 ~f:ty_eq l1 l2
+    | (TySum (t1, t2), TySum (t1', t2')) -> ty_eq t1 t1' && ty_eq t2 t2'
+  
+  let rec tc_t type_context context = function
+    | TVar (l,x) -> begin match List.Assoc.find context x with
+      | Some ty -> ty
+      | None -> raise (FTAL.TypeError ("Variable " ^ x ^ " not in environment", l))
+      end
+    | TUnit _ -> TyUnit
+    | TBool _ -> TyBool
+    | TIf (l, c, t1, t2) -> begin
+      let cTy = tc_t type_context context c in
+      if not (ty_eq cTy TyBool) then 
+        raise (FTAL.TypeError ("Condition " ^ (*TODO*)"..." ^ "not of type Bool", l));
+      let t1Ty = tc_t type_context context t1 in
+      let t2Ty = tc_t type_context context t2 in
+      if ty_eq t1Ty t2Ty then t1Ty
+        else raise (FTAL.TypeError("Branches " ^ (*TODO*)"..." ^ 
+         " and " ^ (*TODO*) "..." ^ "not of the same type",l))
+      end
+end
 and TAL : sig
   open Syntax
   open TAL
