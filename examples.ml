@@ -1,4 +1,5 @@
 open Syntax;;
+open Compiler;;
 
 let simple = {|
 FT [int, ?] (

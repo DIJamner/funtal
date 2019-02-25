@@ -1,9 +1,9 @@
 module Compiler = struct
 
   open Syntax
-  open FTAL
+  open Typecheck.FTAL
+  open Typecheck.TAL
   open TAL
-  
 
   type atstackelem = ABinding of string * A.ty | TElem of t
   type atstack = ATStack of atstackelem list * sigma
@@ -67,34 +67,34 @@ module Compiler = struct
   let rec compileHeapValue initialHeapTy = function
   | A.HCode (l, aas, xts, body) -> 
     (*TODO: handle fail case *)
-    let A.TyCode (_, argTys, resTy) = A.getExpType aas xts body in
-    let revArgTys = List.reverse argTys in
+    let resTy = Typecheck.A.tc_t aas xts body in
+    let revArgTys = List.rev_map snd xts in
     let transArgTys = List.map compileType revArgTys in
-    let zeta = gen_sym(pref="z") in
-    let epsilon = gen_sym(pref="e") in
-    let retLoc = gen_sym(pref="l") in
+    let zeta = gen_sym ~pref:"z" () in
+    let epsilon = gen_sym ~pref:"e" () in
+    let retLoc = gen_sym ~pref:"l" () in
     let talResTy = compileType resTy in
     let raTy = TBox (PBlock ([], [("r1", talResTy)],
       SAbstract ([], zeta), QEpsilon epsilon)) in
-    let argStack = ATStack (TElem raTy :: List.rev_map ABinding xts,
+    let argStack = ATStack (TElem raTy :: List.rev_map (fun (x,t) -> ABinding (x,t)) xts,
       SAbstract ([], zeta)) in
     let (bodyInstrs, bodyHeap, bodyHeapTy) =
       compileExpr initialHeapTy aas argStack body zeta epsilon (QI 0) in
-    let h = HCode (DEpsilon epsilon :: DZeta zeta :: List.map DAlpha aas,
+    let h = HCode (DEpsilon epsilon :: DZeta zeta :: List.map (fun x -> DAlpha x) aas,
       [("ra", raTy)], SAbstract (transArgTys, zeta), QR"ra",
       Isalloc (l,1) ::
       Isst (l,0, "ra")::
-      Imv (l, "ra", UW (WApp (l, WLoc (l, retloc), OQ (QI epsilon) :: 
+      Imv (l, "ra", UW (l, WApp (l, WLoc (l, retLoc), OQ (QEpsilon epsilon) :: 
                                 OS (SAbstract([],zeta)) ::
-                                List.map (OT . TVar) aas)))::
+                                List.map (fun x -> OT (TVar x)) aas)))::
       bodyInstrs) in
-    let retCode = HCode (DEpsilon epsilon :: DZeta zeta :: List.map DAlpha aas,
+    let retCode = HCode (DEpsilon epsilon :: DZeta zeta :: List.map (fun x -> DAlpha x) aas,
       ["r1", talResTy], SAbstract (raTy::transArgTys, zeta), QI 0,
-      [Isld (l,"ra", 0),
-      Isfree (l, List.len xts + 1),
+      [(Isld (l,"ra", 0));
+      Isfree (l, List.length xts + 1);
       Iret (l, "ra", "r1")]) in
     let heap = (retLoc, retCode)::bodyHeap in
-    let heapTy = (retLoc, PBlock (DEpsilon epsilon :: DZeta zeta :: List.map DAlpha aas,
+    let heapTy = (retLoc, PBlock (DEpsilon epsilon :: DZeta zeta :: List.map (fun x -> DAlpha x) aas,
       ["r1", talResTy], SAbstract (raTy::transArgTys, zeta), QI 0))::bodyHeapTy in  
     (h, heap, heapTy)
   | A.HTuple (l, vals) -> 
@@ -102,5 +102,6 @@ module Compiler = struct
     (HTuple tvals, [], [])
   (* | HInl val -> ...
   | HInr val -> ... *)  
+  and compileExpr initialHeapTy aas argStack body zeta epsilon retmark = raise (Failure "TODO")
 
 end

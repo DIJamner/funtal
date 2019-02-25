@@ -36,6 +36,8 @@ module rec FTAL : sig
 
   type substitution = FTerm of string * F.exp
                     | FType of string * F.t
+                    (* TODO: unify types in multilang (use MTC approach?)*)
+                    | AType of string * A.ty 
                     | TType of string * TAL.t
                     | SType of string * TAL.sigma
                     | EMarker of string * TAL.q
@@ -70,6 +72,7 @@ end = struct
 
   type substitution = FTerm of string * F.exp
                     | FType of string * F.t
+                    | AType of string * A.ty
                     | TType of string * TAL.t
                     | SType of string * TAL.sigma
                     | EMarker of string * TAL.q

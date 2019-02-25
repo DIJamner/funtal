@@ -56,6 +56,7 @@ module List' = struct
   let rev = List.rev
   let exists ~f l = List.exists f l
   let sort ~cmp l = List.sort cmp l
+  let rev_map ~f l = List.rev_map f l
 end
 module List = List'
 
