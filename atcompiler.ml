@@ -1,4 +1,4 @@
-module Compiler = struct
+module Atcompiler = struct
 
   open Syntax
   open Typecheck.FTAL

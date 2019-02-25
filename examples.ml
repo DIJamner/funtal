@@ -1,5 +1,5 @@
 open Syntax;;
-open Compiler;;
+open Atcompiler;;
 
 let simple = {|
 FT [int, ?] (
