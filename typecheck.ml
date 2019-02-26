@@ -619,6 +619,8 @@ end = struct
   open Syntax.FTAL
   open Syntax.A
   
+  (* Perform the given substitution, respecting shadowing
+     TODO: respect closure/open substitutions *)
   let rec type_sub = function
     | FTerm _ -> fun x -> x
     | FType (x,ty) -> raise (Failure "F substitution in A types not implemented")
@@ -639,7 +641,22 @@ end = struct
     | SType (x,ty) -> raise (Failure "S substitution in A types not implemented")
     | EMarker (x,q) -> raise (Failure "marker substitution in A types not implemented")
     | SAbs _ -> raise (Failure "this substitution into A types not implemented")
-  and htype_sub _ = raise (Failure "substitution into heap types not implemented")
+  (* Perform the given substitution on a heap type, respecting shadowing
+     TODO: respect closure/open substitutions *)
+  and htype_sub = function
+    | FTerm _ -> fun x -> x
+    | FType (x,ty) -> raise (Failure "F substitution in A heap types not implemented")
+    | AType (x,ty) -> begin
+      let sub = type_sub (AType (x,ty)) in function
+        | TyCode (tyvars, args, res) when List.mem tyvars x -> TyCode (tyvars, args, res)
+        | TyCode (tyvars, args, res) -> TyCode (tyvars, List.map sub args, sub res)
+        | TyTuple elems -> TyTuple (List.map sub elems)
+        | TySum (l, r) -> TySum (sub l, sub r)
+      end
+    | TType (x,ty) -> raise (Failure "T substitution in A heap types not implemented")
+    | SType (x,ty) -> raise (Failure "S substitution in A heap types not implemented")
+    | EMarker (x,q) -> raise (Failure "marker substitution in A heap types not implemented")
+    | SAbs _ -> raise (Failure "this substitution into A heap types not implemented")
   
   let rec ty_eq t1 t2 = match (t1, t2) with
     | (TyUnit, TyUnit) -> true
