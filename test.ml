@@ -681,6 +681,52 @@ let test_ft_factorial_t_ty _ =
        (FTAL.FC e))
     (FTAL.FT (F.TArrow ([F.TInt], F.TInt)), TAL.SConcrete [])
 
+(* "A" language and AT compiler tests *)
+
+(* type substitution tests *)
+
+(* Check that substitution replaces the chosen variable only *)
+let test_a_subst _ =
+  assert_equal
+  (Typecheck.A.type_sub (FTAL.AType ("X",A.TyUnit))
+    (A.TyRef (A.TyTuple [A.TyVar "X"; A.TyVar "Y"])))
+  (A.TyRef (A.TyTuple [A.TyUnit; A.TyVar "Y"]))
+
+
+(* Check that substitution respects shadowing *)
+let test_a_subst_shadow _ =
+  assert_equal
+  (Typecheck.A.type_sub (FTAL.AType ("X",A.TyUnit))
+    (A.TyExist ("X", (A.TyVar "X"))))
+  (A.TyExist ("X", (A.TyVar "X")))
+
+(* Check that substitution respects shadowing *)
+let test_a_subst_no_shadow _ =
+  assert_equal
+  (Typecheck.A.type_sub (FTAL.AType ("X",A.TyUnit))
+    (A.TyExist ("Y", A.TyVar "X")))
+  (A.TyExist ("Y", A.TyUnit))
+
+(* typechecker tests *)
+let test_a_var_ty _ =
+  assert_equal
+    (Typecheck.A.tc_t [] ["X"] [("x",A.TyVar "X")] (A.TVar (dummy_loc,"x")))
+    (A.TyVar "X")
+
+let test_a_inst_ty _ =
+  assert_equal
+    (Typecheck.A.tc_t [("l", (HKBox, TyCode(["X"], [], TyUnit)))] [] []
+      (A.TApp (dummy_loc, (A.TInst (dummy_loc, A.TLoc (dummy_loc,"l"), A.TyUnit)), [])))
+    (A.TyUnit)
+
+let test_a_inst_bad_ty _ =
+  assert_raises (Typecheck.FTAL.TypeError ("Type TODO not well formed",dummy_loc))
+    (fun () -> 
+      Typecheck.A.tc_t [("l", (HKBox, TyCode(["X"], [], TyUnit)))] [] []
+      (A.TInst (dummy_loc, A.TLoc (dummy_loc,"l"), A.TyVar "Y")))
+
+(* end of "A" language and AT compiler tests *)
+
 let test_examples _ =
   let assert_roundtrip_f fexpr =
     let reparsed = Parse.parse_string Parse.f_expression_eof (Pretty.F.show_exp fexpr) in
@@ -765,6 +811,12 @@ let suite = "FTAL evaluations" >:::
               "FT: factorial : int -> int" >:: test_ft_factorial_t_ty;
               "FT: with_ref : int" >:: test_with_ref_ty;
               "FT: with_ref = 7" >:: test_with_ref;
+              "A: type var substitution" >:: test_a_subst;
+              "A: type var substitution shadowing" >:: test_a_subst_shadow;
+              "A: type var substitution under binders" >:: test_a_subst_no_shadow;
+              "A: variable type-check" >:: test_a_var_ty;
+              "A: location instantiation" >:: test_a_inst_ty;
+              "A: malformed instantiation" >:: test_a_inst_bad_ty;
               "Example roundtrips" >:: test_examples;
             ]
 

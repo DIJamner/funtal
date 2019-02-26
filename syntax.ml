@@ -221,7 +221,7 @@ and A : sig
   
   type heap = (loc * h) list
   
-  type heapty = (loc * hkind * hty) list
+  type heapty = (loc * (hkind * hty)) list
   
   type tyctx = string list
   
@@ -283,7 +283,7 @@ end = struct
 
   type heap = (loc * h) list
 
-  type heapty = (loc * hkind * hty) list
+  type heapty = (loc * (hkind * hty)) list
 
   type tyctx = string list
 

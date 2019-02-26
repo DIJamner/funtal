@@ -611,14 +611,35 @@ and A : sig
   open Syntax.A
   
   val ty_eq : ty -> ty -> bool
-  val tc_t : tyctx -> ctx -> t -> ty (* tyEnv env t *)
+  val tc_t : heapty -> tyctx -> ctx -> t -> ty (* Heap tyEnv env t *)
+  val tc_h : heapty -> h -> hty
   val type_sub : substitution -> ty -> ty
   
 end = struct
   open Syntax.FTAL
   open Syntax.A
   
-  let rec type_sub _ = raise (Failure "Not yet implemented")
+  let rec type_sub = function
+    | FTerm _ -> fun x -> x
+    | FType (x,ty) -> raise (Failure "F substitution in A types not implemented")
+    | AType (x,ty) -> 
+      let rec sub = function
+        | TyVar y when x = y -> ty
+        | TyVar y -> TyVar y
+        | TyUnit -> TyUnit
+        | TyBool -> TyBool
+        | TyExist (y, ty) when x = y -> TyExist (y, ty)
+        | TyExist (y, ty) -> TyExist (y, sub ty)
+        | TyRec (y, ty) when x = y -> TyRec (y, ty)
+        | TyRec (y, ty) -> TyRec (y, sub ty)
+        | TyRef hty -> TyRef (htype_sub (AType (x,ty)) hty)
+        | TyBox hty -> TyBox (htype_sub (AType (x,ty)) hty)
+      in sub
+    | TType (x,ty) -> raise (Failure "T substitution in A types not implemented")
+    | SType (x,ty) -> raise (Failure "S substitution in A types not implemented")
+    | EMarker (x,q) -> raise (Failure "marker substitution in A types not implemented")
+    | SAbs _ -> raise (Failure "this substitution into A types not implemented")
+  and htype_sub _ = raise (Failure "substitution into heap types not implemented")
   
   let rec ty_eq t1 t2 = match (t1, t2) with
     | (TyUnit, TyUnit) -> true
@@ -636,7 +657,10 @@ end = struct
     | (TyTuple l1, TyTuple l2) -> list_for_all2 ~f:ty_eq l1 l2
     | (TySum (t1, t2), TySum (t1', t2')) -> ty_eq t1 t1' && ty_eq t2 t2'
   
-  let rec tc_t type_context context = function
+  (* Computes the type of an A term under the given contexts *)
+  let rec tc_t heapty type_context context = 
+    let tc_t_ctx t = tc_t heapty type_context context t in
+    function
     | TVar (l,x) -> begin match List.Assoc.find context x with
       | Some ty -> ty
       | None -> raise (FTAL.TypeError ("Variable " ^ x ^ " not in environment", l))
@@ -644,15 +668,38 @@ end = struct
     | TUnit _ -> TyUnit
     | TBool _ -> TyBool
     | TIf (l, c, t1, t2) -> begin
-      let cTy = tc_t type_context context c in
+      let cTy = tc_t_ctx c in
       if not (ty_eq cTy TyBool) then 
         raise (FTAL.TypeError ("Condition " ^ (*TODO*)"..." ^ "not of type Bool", l));
-      let t1Ty = tc_t type_context context t1 in
-      let t2Ty = tc_t type_context context t2 in
+      let t1Ty = tc_t_ctx t1 in
+      let t2Ty = tc_t_ctx t2 in
       if ty_eq t1Ty t2Ty then t1Ty
         else raise (FTAL.TypeError("Branches " ^ (*TODO*)"..." ^ 
          " and " ^ (*TODO*) "..." ^ "not of the same type",l))
       end
+    | TInst (l, t, ty) -> begin
+      (* TODO: type well-formedness for the argument *)
+      match tc_t_ctx t with
+      | TyBox (TyCode (x::tyvars, args, res)) -> 
+        let sub = AType (x, ty) |> type_sub in
+        TyBox (TyCode (tyvars, List.map ~f:sub args, (sub res)))
+      | t -> raise (FTAL.TypeError ("Expected polymorphic code, got " ^ (*TODO*)"...", l))
+      end
+    | TLoc (l, loc) -> begin match List.Assoc.find heapty loc with
+      | Some (HKBox, ht) -> TyBox ht
+      | Some (HKRef, ht) -> TyRef ht
+      | None -> raise (FTAL.TypeError ("Location " ^ loc ^ " was not in the context", l))
+      end
+    | TApp (l, f, args) -> begin
+      let argTys = List.map tc_t_ctx args in
+      match tc_t_ctx f with
+      | TyBox (TyCode (tyvars, argTys', res)) 
+        when tyvars = [] && List.for_all2_exn ty_eq argTys argTys' -> res
+      | t -> raise (FTAL.TypeError ("Expected code, got " ^ (*TODO*)"...", l))
+      end
+    
+    let tc_h heapty _ = raise  (Failure "Heap typing not yet implemented")
+    
 end
 and TAL : sig
   open Syntax

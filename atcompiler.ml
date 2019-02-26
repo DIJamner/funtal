@@ -67,7 +67,7 @@ module Atcompiler = struct
   let rec compileHeapValue initialHeapTy = function
   | A.HCode (l, aas, xts, body) -> 
     (*TODO: handle fail case *)
-    let resTy = Typecheck.A.tc_t aas xts body in
+    let resTy = Typecheck.A.tc_t initialHeapTy aas xts body in
     let revArgTys = List.rev_map snd xts in
     let transArgTys = List.map compileType revArgTys in
     let zeta = gen_sym ~pref:"z" () in
