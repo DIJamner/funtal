@@ -715,15 +715,25 @@ let test_a_var_ty _ =
 
 let test_a_inst_ty _ =
   assert_equal
-    (Typecheck.A.tc_t [("l", (HKBox, TyCode(["X"], [], TyUnit)))] [] []
+    (Typecheck.A.tc_t [("l", (A.HKBox, A.TyCode(["X"], [], A.TyUnit)))] [] []
       (A.TApp (dummy_loc, (A.TInst (dummy_loc, A.TLoc (dummy_loc,"l"), A.TyUnit)), [])))
     (A.TyUnit)
 
 let test_a_inst_bad_ty _ =
   assert_raises (Typecheck.FTAL.TypeError ("Type TODO not well formed",dummy_loc))
     (fun () -> 
-      Typecheck.A.tc_t [("l", (HKBox, TyCode(["X"], [], TyUnit)))] [] []
+      Typecheck.A.tc_t [("l", (A.HKBox, A.TyCode(["X"], [], A.TyUnit)))] [] []
       (A.TInst (dummy_loc, A.TLoc (dummy_loc,"l"), A.TyVar "Y")))
+
+(* compiler tests *)
+let test_at_code_ty _ =
+  assert_equal ~cmp:Typecheck.TAL.t_eq
+    ~pp_diff:(fun f (ac, ex) -> 
+      Format.fprintf f "@[Expected: %s@], @[Actual: %s@]@." (Pretty.TAL.show ex) (Pretty.TAL.show ac))
+    (Atcompiler.compileType (A.TyBox(A.TyCode(["X"], [A.TyVar "X"; A.TyVar "X"], A.TyVar "X"))))
+    (TAL.TBox(TAL.PBlock([DZeta "Z";DEpsilon "e";DAlpha "X"],
+      [("ra", TAL.TBox(TAL.PBlock([], [("r1", TAL.TVar "X")], SAbstract([], "Z"), QEpsilon "e")))],
+      SAbstract([TAL.TVar "X";TAL.TVar "X"], "Z"), QR "ra")))
 
 (* end of "A" language and AT compiler tests *)
 
@@ -817,6 +827,7 @@ let suite = "FTAL evaluations" >:::
               "A: variable type-check" >:: test_a_var_ty;
               "A: location instantiation" >:: test_a_inst_ty;
               "A: malformed instantiation" >:: test_a_inst_bad_ty;
+              "AT: code type" >:: test_at_code_ty;
               "Example roundtrips" >:: test_examples;
             ]
 
