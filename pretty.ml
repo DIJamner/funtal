@@ -411,3 +411,35 @@ end = struct
     | TI is -> TAL.show_instrs is
 
 end
+and A : sig
+  val p_ty : Syntax.A.ty -> document
+  val p_hty : Syntax.A.hty -> document
+  
+  val show_ty : Syntax.A.ty -> string
+
+end = struct
+  open PPrint
+  open Syntax.A
+
+  (* pretty printing functions for A types and heap types *)
+  let rec p_ty (t : ty) : document =
+    match t with
+    | TyVar s -> !^s
+    | TyUnit -> !^"unit"
+    | TyBool -> !^"bool"
+    | TyExist (x, t) -> nest 2 (!^"exists " ^^ !^x ^^ dot ^^ p_ty t)
+    | TyRec(a,t) -> nest 2 (!^"mu " ^^ !^a ^^ dot ^^ p_ty t)
+    | TyRef ht -> nest 2 (!^"ref " ^^ p_hty ht)
+    | TyBox ht -> nest 2 (!^"ref " ^^ p_hty ht)
+  and p_hty : hty -> document = function
+    | TyCode (xs, args, res) -> nest 2 begin
+      !^"code" ^^ lbrace ^^ group (separate_map (comma ^^ break 1) (!^) xs) ^^ rbrace
+      ^^ lparen ^^ group (separate_map (comma ^^ break 1) p_ty args) ^^ rparen
+      ^^ !^" -> " ^^ p_ty res
+    end
+    | TyTuple ts -> nest 2 (langle ^^ group (separate_map (comma ^^ break 1) p_ty ts) ^^ rangle)
+    | TySum (t1, t2) -> nest 2 (lparen ^^ group (p_ty t1 ^^ !^" + " ^^ break 1 ^^ p_ty t2) ^^ rparen)
+    
+  let show_ty t = pprint (p_ty t)
+    
+end
